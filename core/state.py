@@ -7,6 +7,7 @@ class ArticleState(TypedDict):
     title: str
     summary: str
     source: str
+    date: str
 
 class FilteredArticleState(ArticleState):
     is_passed: bool

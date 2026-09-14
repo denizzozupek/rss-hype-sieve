@@ -1,8 +1,7 @@
-import asyncio
 import feedparser
 import re
 import html
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from core.config import DEFAULT_SOURCES, DEFAULT_JSON_SOURCES
 from core.state import ArticleState
@@ -37,54 +36,37 @@ def _clean_and_extract_summary(entry: dict) -> str:
         return clean_summary or "No summary available."
 
 
-def _parse_date(entry: dict) -> str:
+def _parse_date(entry: dict) -> datetime | None:
     time_struct = (
         entry.get("published_parsed")
         or entry.get("updated_parsed")
         or None
     )
     if time_struct:
-        return datetime(*time_struct[:6]).strftime(datetime_format)
-    return ""
+        return datetime(*time_struct[:6])
+    return None
 
-
-def _filter_articles_by_date(articles: list[dict], filter_days: int) -> list[ArticleState]:
-    """Filters articles based on the provided filter_days parameter."""
-    if filter_days <= 0:
-        return articles  # No filtering needed
-
-    filtered_articles = []
-    current_time = datetime.now()
-
-    for article in articles:
-        article_date_str = _parse_date(article)
-        if article_date_str:
-            try:
-                article_date = datetime.strptime(article_date_str, datetime_format)
-                delta = current_time - article_date
-                if delta.days <= filter_days:
-                    filtered_articles.append(article)
-            except ValueError:
-                print(f"Error parsing date for article: {article.get('title', 'Unknown title')}")
-
-    return filtered_articles
-
-
-def fetch_all_rss_feeds(sources: list[str], filter_days: int) -> list[ArticleState]:
+def fetch_all_rss_feeds(sources: list[str], filter_days: int = 7) -> list[ArticleState]:
     """Fetches articles from all RSS feeds provided in the sources list."""
 
     articles: list[ArticleState] = []
+
+    cutoff_date = datetime.now() - timedelta(days=filter_days)
 
     for source in sources:
         try:
             feed = feedparser.parse(source)
             for entry in feed.entries:
 
+                entry_date = _parse_date(entry)
+                if entry_date is None or entry_date < cutoff_date:
+                    continue  # Skip articles that are too old or have no date
+
                 final_summary = _clean_and_extract_summary(entry)
 
                 article_state: ArticleState = {
                     "url": entry.get("link", "") or "",
-                    "date": _parse_date(entry),
+                    "date": entry_date.strftime(datetime_format),
                     "title": entry.get("title", "No title available."),
                     "summary": final_summary,
                     "source": source,
@@ -101,5 +83,4 @@ if __name__ == "__main__":
     # Example usage
     sources = DEFAULT_SOURCES  # Use the default sources defined in config
     articles = fetch_all_rss_feeds(sources)
-    articles1 = articles[0]["date"]
-    print(articles1)
+    print(f"Fetched {len(articles)} articles.")
