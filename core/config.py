@@ -9,3 +9,6 @@ DEFAULT_SOURCES: list[str] = [
 ]
 
 DEFAULT_JSON_SOURCES: list[str] = ["https://huggingface.co/api/daily_papers"]
+
+DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+RETRIABLE_STATUS_CODES = {429, 500, 502, 503, 504}

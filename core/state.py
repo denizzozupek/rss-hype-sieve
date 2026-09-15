@@ -1,5 +1,4 @@
 from typing import TypedDict
-
 from models.filter import HypeRules
 
 class ArticleState(TypedDict):
@@ -20,4 +19,9 @@ class PipelineGraphState(TypedDict):
     raw_articles: list[ArticleState]    
     filtered_articles: list[FilteredArticleState]
     final_report: str
+
+class IngestionBatchResult(TypedDict):
+    articles: list[ArticleState]
+    failed_sources: dict[str, str]
+    total_fetched: int
 
