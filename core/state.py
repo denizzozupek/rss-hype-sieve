@@ -19,6 +19,7 @@ class PipelineGraphState(TypedDict):
     raw_articles: list[ArticleState]    
     filtered_articles: list[FilteredArticleState]
     final_report: str
+    saved_articles_count: int
 
 class IngestionBatchResult(TypedDict):
     articles: list[ArticleState]
