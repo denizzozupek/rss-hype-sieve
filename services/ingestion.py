@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, TypedDict
+from typing import Callable
 
 import feedparser
 import httpx
@@ -13,7 +13,7 @@ from tenacity import (
     wait_random_exponential,
 )
 
-from core.config import DEFAULT_JSON_SOURCES, DEFAULT_SOURCES, DATETIME_FORMAT, RETRIABLE_STATUS_CODES
+from core.config import DEFAULT_SOURCES, DATETIME_FORMAT, RETRIABLE_STATUS_CODES
 from core.state import ArticleState, IngestionBatchResult
 
 logging.basicConfig(level=logging.INFO)
@@ -72,62 +72,26 @@ def _parse_rss(content: str, source: str, cutoff_date: datetime) -> list[Article
     return articles
 
 
-def _parse_hf_json(data: Any, source: str, cutoff_date: datetime) -> list[ArticleState]:
-    if not isinstance(data, list):
-        raise ValueError(f"Expected JSON list, got {type(data)}")
-
-    articles: list[ArticleState] = []
-    for item in data:
-        paper = item.get("paper", {})
-        paper_id = paper.get("id")
-        entry_date_str = item.get("publishedAt", "")
-        if not paper_id or not entry_date_str:
-            continue
-
-        try:
-            entry_date = datetime.fromisoformat(entry_date_str.replace("Z", "+00:00"))
-        except ValueError:
-            continue
-
-        if entry_date < cutoff_date:
-            continue
-
-        summary = paper.get("ai_summary") or item.get("summary") or ""
-        articles.append(
-            {
-                "url": f"https://huggingface.co/papers/{paper_id}",
-                "title": item.get("title", "No title available.").strip(),
-                "summary": summary.strip(),
-                "source": source,
-                "date": entry_date.strftime(DATETIME_FORMAT),
-            }
-        )
-    return articles
-
-
 # =========== Generic Worker & Orchestrator ===========
 
 async def _fetch_and_parse(
     client: httpx.AsyncClient,
     source: str,
     cutoff_date: datetime,
-    parser: Callable[[Any, str, datetime], list[ArticleState]],
-    is_json: bool = False,
+    parser: Callable[[str, str, datetime], list[ArticleState]],
 ) -> list[ArticleState]:
     response = await _fetch_url(client, source)
-    payload = response.json() if is_json else response.text
+    payload = response.text
     return parser(payload, source, cutoff_date)
 
 
-async def fetch_all_sources(
+async def fetch_all_rss_feeds(
     sources: list[str] | None = None,
-    json_sources: list[str] | None = None,
     filter_days: int = 7,
 ) -> IngestionBatchResult:
     sources = sources or []
-    json_sources = json_sources or []
 
-    if not sources and not json_sources:
+    if not sources:
         logger.warning("No sources provided.")
         return {"articles": [], "failed_sources": {}, "total_fetched": 0}
 
@@ -139,16 +103,12 @@ async def fetch_all_sources(
     try:
         async with httpx.AsyncClient(timeout=15.0, limits=limits, follow_redirects=True) as client:
             tasks = [
-                _fetch_and_parse(client, s, cutoff_date, _parse_rss, is_json=False)
+                _fetch_and_parse(client, s, cutoff_date, _parse_rss)
                 for s in sources
-            ] + [
-                _fetch_and_parse(client, s, cutoff_date, _parse_hf_json, is_json=True)
-                for s in json_sources
             ]
-            all_targets = sources + json_sources
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
-            for target_url, result in zip(all_targets, results):
+            for target_url, result in zip(sources, results):
                 if isinstance(result, Exception):
                     error_msg = f"{result.__class__.__name__}: {str(result)}"
                     failed_sources[target_url] = error_msg
@@ -166,10 +126,9 @@ async def fetch_all_sources(
         "total_fetched": len(all_articles),
     }
 
-
 if __name__ == "__main__":
     result = asyncio.run(
-        fetch_all_sources(sources=DEFAULT_SOURCES, json_sources=DEFAULT_JSON_SOURCES)
+        fetch_all_rss_feeds(sources=DEFAULT_SOURCES)
     )
     print(f"\n--- Ingestion Summary ---")
     print(f"Total: {result['total_fetched']} | Failed: {len(result['failed_sources'])}")
