@@ -22,7 +22,7 @@ LLM_REPORT_PROMPT = ChatPromptTemplate.from_messages(
         (
             "system",
             "You are a senior technical editor and AI analyst. "
-            "Your task is to synthesize the provided list of filtered technical articles into a concise, high-signal Markdown briefing for software engineers.\n\n"
+            "Your task is to synthesize the provided list of evaluated technical articles into a concise, high-signal Markdown briefing for software engineers.\n\n"
             "Formatting Guidelines:\n"
             "- Start directly with the first article without any introductory greetings, meta-commentary, or pleasantries.\n"
             "- Structure each item using this exact format:\n"

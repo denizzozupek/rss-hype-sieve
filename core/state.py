@@ -8,7 +8,7 @@ class ArticleState(TypedDict):
     source: str
     date: str
 
-class FilteredArticleState(ArticleState):
+class EvaluatedArticleState(ArticleState):
     is_passed: bool
     hype_score: int
     hype_reason: str
@@ -16,10 +16,12 @@ class FilteredArticleState(ArticleState):
 
 class PipelineGraphState(TypedDict):
     sources: list[str]
-    raw_articles: list[ArticleState]    
-    filtered_articles: list[FilteredArticleState]
+    raw_articles: list[ArticleState]
+    evaluated_articles: list[EvaluatedArticleState]
+    failed_articles: list[ArticleState]
     final_report: str
     saved_articles_count: int
+    db_error: str | None
 
 class IngestionBatchResult(TypedDict):
     articles: list[ArticleState]

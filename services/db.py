@@ -4,7 +4,7 @@ from contextlib import closing
 from pathlib import Path
 from typing import Collection
 
-from core.state import FilteredArticleState
+from core.state import EvaluatedArticleState
 
 logger = logging.getLogger(__name__)
 
@@ -51,11 +51,11 @@ def get_existing_urls(
 
 
 def save_articles(
-    articles: list[FilteredArticleState], db_path: Path | str = DEFAULT_DB_PATH
-) -> None:
+    articles: list[EvaluatedArticleState], db_path: Path | str = DEFAULT_DB_PATH
+) -> int:
     if not articles:
         logger.info("No articles to save.")
-        return
+        return 0
     with closing(sqlite3.connect(db_path, timeout=10.0)) as conn:
         with conn:
             records = [(article["url"], article["title"], article["source"], article.get("summary"), article.get("is_passed"), article.get("hype_score"), article.get("hype_reason"), article.get("violated_rule")) for article in articles]
@@ -65,3 +65,4 @@ def save_articles(
                 (url, title, source, summary, is_passed, hype_score, hype_reason, violated_rule)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, records)
+        return len(records)
