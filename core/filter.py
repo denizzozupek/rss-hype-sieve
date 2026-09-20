@@ -1,33 +1,34 @@
-from pydantic import BaseModel, ConfigDict, Field
 from typing import Literal
+from pydantic import BaseModel, ConfigDict, Field
 
 hype_score_description = (
-    "A numeric score from 1 to 10 evaluating the marketing hype vs. technical substance: "
-    "1-3 = Highly technical, grounded, contains code/benchmarks/concrete architecture; "
-    "4-6 = Informative but contains minor buzzwords or light promotional framing; "
-    "7-8 = Significant hype, unsubstantiated claims, or excessive buzzwords with little technical depth; "
-    "9-10 = Pure marketing puffery, clickbait, or completely unverified revolutionary claims."
+    "A numeric score from 1 to 10 evaluating marketing hype vs. informational substance: "
+    "1-3 = Factual news, verified technical or business developments; "
+    "4-6 = Newsworthy topic or release with acceptable promotional language; "
+    "7-10 = High hype, pure PR, conference sales, or empty buzzwords."
 )
 
 HypeRules = Literal[
-    "none",
-    "unsubstantiated_claims",
-    "buzzword_stuffing",
-    "pure_marketing",
+    "NONE",
+    "EVENT_PROMOTION",
+    "BUZZWORD_HEAVY",
+    "UNVERIFIED_CLAIMS",
+    "CLICKBAIT_OR_GOSSIP",
 ]
 
 
 class HypeEvaluation(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
     hype_reason: str = Field(
-        description="A brief explanation for the hype score assigned to the summary of articles"
+        description="A brief explanation justifying the assigned score and whether the article carries actual news value."
     )
     violated_rule: HypeRules = Field(
         description=(
-            "The primary category of hype detected. Use 'none' if the content is technically grounded. "
-            "'unsubstantiated_claims' for bold metrics/breakthroughs without proof, "
-            "'buzzword_stuffing' for heavy jargon without architecture/implementation, "
-            "'pure_marketing' for promotional product announcements or waitlists."
+            "The primary category of hype detected. "
+            "Must be 'NONE' if the hype_score is 1-6. "
+            "Use other categories ('EVENT_PROMOTION', 'BUZZWORD_HEAVY', 'UNVERIFIED_CLAIMS', 'CLICKBAIT_OR_GOSSIP') "
+            "only when hype_score is 7 or higher."
         )
     )
     hype_score: int = Field(ge=1, le=10, description=hype_score_description)

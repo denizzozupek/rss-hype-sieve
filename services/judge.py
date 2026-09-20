@@ -74,7 +74,7 @@ async def evaluate_articles_batch(
                 "summary": article["summary"],
                 "source": article["source"],
                 "date": article["date"],
-                "is_passed": (result.hype_score <= threshold_hype_score),
+                "is_passed": (result.hype_score <= threshold_hype_score) and (result.violated_rule == "NONE"),
                 "hype_score": result.hype_score,
                 "hype_reason": result.hype_reason,
                 "violated_rule": result.violated_rule}
