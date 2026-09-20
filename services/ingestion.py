@@ -52,19 +52,35 @@ def _parse_rss(content: str, source: str, cutoff_date: datetime) -> list[Article
     for entry in feed.entries:
         link = entry.get("link", "").strip()
         time_struct = entry.get("published_parsed") or entry.get("updated_parsed")
-        if not link or not time_struct:
-            continue
+
+        if not link:
+            continue  # Skip entries without a valid link
+
+        if not time_struct:
+            logger.warning(f"Entry missing date, adding today's date: {entry.get('title', 'No title')}")
+            time_struct = datetime.now(timezone.utc).timetuple()
 
         entry_date = datetime(*time_struct[:6], tzinfo=timezone.utc)
         if entry_date < cutoff_date:
             continue
 
         summary = entry.get("summary") or entry.get("description") or ""
+        
+        raw_content = entry.get("content")
+
+        if isinstance(raw_content, list) and raw_content and isinstance(raw_content[0], dict):
+            content = raw_content[0].get("value", "")
+        elif isinstance(raw_content, str):
+            content = raw_content
+        else:
+            content = ""
+
         articles.append(
             {
                 "url": link,
                 "title": entry.get("title", "No title available.").strip(),
                 "summary": summary.strip(),
+                "content": content.strip(),
                 "source": source,
                 "date": entry_date.strftime(DATETIME_FORMAT),
             }

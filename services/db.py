@@ -5,10 +5,9 @@ from pathlib import Path
 from typing import Collection
 
 from core.state import EvaluatedArticleState
+from core.config import DEFAULT_DB_PATH
 
 logger = logging.getLogger(__name__)
-
-DEFAULT_DB_PATH = Path("db/hype_evaluations.db")
 
 
 def db_init(db_path: Path | str = DEFAULT_DB_PATH) -> None:

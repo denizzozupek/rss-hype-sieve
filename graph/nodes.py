@@ -35,8 +35,10 @@ async def ingest_node(state: PipelineGraphState):
     existing_urls = await asyncio.to_thread(get_existing_urls, incoming_urls)
 
     # Filter out already existing articles
-    new_articles = [
-        article for article in articles if article.get("url") not in existing_urls
+    new_articles: list[ArticleState] = [
+        article
+        for article in articles
+        if article.get("url") and article.get("url") not in existing_urls
     ]
 
     logger.info(f"Fetched {len(new_articles)} new articles from RSS feeds.")
@@ -44,53 +46,57 @@ async def ingest_node(state: PipelineGraphState):
 
 
 # Clean summary from HTML tags and unescape HTML entities
-async def clean_node(state: PipelineGraphState):
+async def preprocess_text_node(state: PipelineGraphState):
     """Clean summaries and content of articles in the graph."""
 
     raw_articles: list[ArticleState] = state.get("raw_articles", [])
     if not raw_articles:
         logger.info("No raw articles to clean.")
-        return {"raw_articles": []}
+        return {"cleaned_articles": []}
 
     cleaned_articles: list[ArticleState] = []
     for article in raw_articles:
 
         summary = article.get("summary")
-        content = article.get("content")
+        content = article.get("content", None)
 
         if not summary and not content:
             logger.warning(f"Article {article.get('url')} has no summary or content.")
             continue
 
-        cleaned_summary = extract_clean_summary(
-            summary, content
-        )
-        cleaned_article = {
-            **article,
+        cleaned_summary = extract_clean_summary(summary, content)
+
+        cleaned_article: ArticleState = {
+            "url": article["url"],
+            "title": article["title"],
             "summary": cleaned_summary,
+            "source": article["source"],
+            "date": article["date"],
         }
+
         cleaned_articles.append(cleaned_article)
 
     logger.info(f"Cleaned {len(cleaned_articles)} articles.")
-    return {"raw_articles": cleaned_articles}
+    return {"cleaned_articles": cleaned_articles}
 
 
 async def judge_node(state: PipelineGraphState):
     """Evaluate articles against hype rules and add evaluation results to the graph."""
-    raw_articles: list[ArticleState] = state.get("raw_articles", [])
+    cleaned_articles: list[ArticleState] = state.get("cleaned_articles", [])
 
-    if not raw_articles:
-        logger.info("No raw articles to evaluate.")
+    if not cleaned_articles:
+        logger.info("No cleaned articles to evaluate.")
         return {"evaluated_articles": [], "failed_articles": []}
 
     # Evaluate articles against hype rules
-    evaluated_articles, failed_articles = await evaluate_articles_batch(raw_articles)
+    evaluated_articles, failed_articles = await evaluate_articles_batch(
+        cleaned_articles
+    )
     logger.info(
         f"Evaluated {len(evaluated_articles)} articles, {len(failed_articles)} articles failed to evaluate."
     )
 
     return {
-        "raw_articles": [],
         "evaluated_articles": evaluated_articles,
         "failed_articles": failed_articles,
     }

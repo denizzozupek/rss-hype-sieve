@@ -2,30 +2,34 @@ import asyncio
 import logging
 from langchain_core.rate_limiters import InMemoryRateLimiter
 from langchain.chat_models import init_chat_model
+from langchain_core.runnables import Runnable
 
 from prompts.llm_prompts import LLM_FILTER_PROMPT
-from models.filter import HypeEvaluation
+from core.filter import HypeEvaluation
 from core.state import EvaluatedArticleState, ArticleState
 
 logger = logging.getLogger(__name__)
 
+
 # Initialize the rate limiter and chat model with specified parameters
-rate_limiter = InMemoryRateLimiter(max_calls=60, unit="minute")
-model = init_chat_model(
-    model_name="gpt-4o-mini", rate_limiter=rate_limiter, temperature=0.0, max_retries=3
-)
+rate_limiter = InMemoryRateLimiter(requests_per_second=1, check_every_n_seconds=0.1, max_bucket_size=10)
+def get_judge_chain():
+    model = init_chat_model(
+        "gpt-4o-mini", model_provider="openai", rate_limiter=rate_limiter, temperature=0.0, max_retries=3
+    )
 
-structured_output = model.with_structured_output(HypeEvaluation)
-chain = LLM_FILTER_PROMPT | structured_output
+    structured_output = model.with_structured_output(HypeEvaluation)
+    chain = LLM_FILTER_PROMPT | structured_output
+    return chain
 
 
-# =========== Functions for filtering articles ===========
+# =========== Functions for evaluating articles ===========
 async def evaluate_article(
-    title: str, summary: str, semaphore: asyncio.Semaphore
+    title: str, summary: str, semaphore: asyncio.Semaphore, chain: Runnable
 ) -> HypeEvaluation:
 
     async with semaphore:
-        logger.info(f"Filtering article: {title}")
+        logger.info(f"Evaluating article: {title}")
         response = await chain.ainvoke({"title": title, "summary": summary})
         return response
 
@@ -34,6 +38,8 @@ async def evaluate_article(
 async def evaluate_articles_batch(
     articles: list[ArticleState], threshold_hype_score: int = 6, max_concurrent: int = 5
 ) -> tuple[list[EvaluatedArticleState], list[ArticleState]]:
+
+    chain = get_judge_chain()
 
     # Initialize lists to hold evaluated and non-evaluated articles
     evaluated_articles: list[EvaluatedArticleState] = []
@@ -45,7 +51,7 @@ async def evaluate_articles_batch(
     # 1. Create tasks for filtering articles concurrently
     logger.info(f"Evaluating batch of {len(articles)} articles")
     tasks = [
-        evaluate_article(article["title"], article["summary"], semaphore)
+        evaluate_article(article["title"], article["summary"], semaphore, chain)
         for article in articles
     ]
     results = await asyncio.gather(*tasks, return_exceptions=True)
