@@ -3,7 +3,7 @@ import logging
 from core.state import PipelineGraphState
 from services.db import db_init
 from graph.pipeline import create_pipeline_graph
-from core.config import OPENAI_API_KEY, DEFAULT_DB_PATH
+from core.config import OPENAI_API_KEY, DEFAULT_DB_PATH, DEFAULT_SOURCES
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -14,8 +14,9 @@ logging.basicConfig(
 
 async def main():
 
-    initial_state: PipelineGraphState = {"sources": ["https://techcrunch.com/feed/"]}
-
+    initial_state: PipelineGraphState = {
+    "sources": list(DEFAULT_SOURCES),
+    }
     # Initialize the database
     try:
         await asyncio.to_thread(db_init, DEFAULT_DB_PATH)
@@ -33,6 +34,7 @@ async def main():
     # Execute the pipeline graph
     try:
         final_state = await pipeline_graph.ainvoke(initial_state)
+        print(final_state.get("final_report", "No final report generated."))
     except Exception as e:
         logger.error(f"Failed to execute the pipeline graph: {e}")
         return

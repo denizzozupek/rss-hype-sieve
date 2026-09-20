@@ -125,37 +125,67 @@ async def save_node(state: PipelineGraphState):
 
 
 async def report_node(state: PipelineGraphState):
-    """Generate a final report based on the evaluation results."""
-
-    evaluated_articles: list[EvaluatedArticleState] = state.get(
-        "evaluated_articles", []
-    )
+    """Generate the final briefing report containing passed articles and operational metrics."""
+    evaluated_articles: list[EvaluatedArticleState] = state.get("evaluated_articles", [])
     failed_articles: list[ArticleState] = state.get("failed_articles", [])
 
     if not evaluated_articles and not failed_articles:
         logger.info("No articles to report.")
-        return {"final_report": "No articles to report."}
+        return {"final_report": "No articles processed."}
 
-    db_error = state.get("db_error")
+    # 1.Filter out articles that passed the hype evaluation
+    passed_articles = [
+        article for article in evaluated_articles if article.get("is_passed")
+    ]
 
+    # 2. Calculate counts and percentages for reporting
     total_evaluated = len(evaluated_articles)
-    passed_count = sum(1 for a in evaluated_articles if a.get("is_passed"))
+    passed_count = len(passed_articles)
     rejected_count = total_evaluated - passed_count
-
     passed_pct = (passed_count / total_evaluated * 100) if total_evaluated else 0.0
     rejected_pct = (rejected_count / total_evaluated * 100) if total_evaluated else 0.0
 
-    report_lines = [
-        "## Pipeline Execution Summary",
-        f"- Total Evaluated by LLM: {total_evaluated}",
-        f"- Passed (Low Hype): {passed_count} ({passed_pct:.1f}%)",
-        f"- Filtered Out (High Hype): {rejected_count} ({rejected_pct:.1f}%)",
-        f"- Technical Failures (LLM/API): {len(failed_articles)}",
-        f"- Successfully Persisted to DB: {state.get('saved_articles_count', 0)}",
-        f"- Database Errors: {db_error if db_error else 'None'}",
+    report_sections: list[str] = [
+        "# Daily Technical Briefing (De-Hype Feed)",
+        f"*Curated {passed_count} high-signal articles out of {total_evaluated} total ingested.*",
+        "\n---",
     ]
 
-    final_report = "\n".join(report_lines)
-    logger.info(f"Pipeline report generated:\n{final_report}")
+    # 3. Make a section for passed articles with their details
+    if passed_articles:
+        report_sections.append("## Curated Articles\n")
+        for idx, article in enumerate(passed_articles, start=1):
+            title = article.get("title", "Untitled")
+            url = article.get("url", "#")
+            score = article.get("hype_score", "N/A")
+            reason = article.get("hype_reason", "No justification provided.")
+            summary = article.get("summary", "").strip()
+
+            article_block = (
+                f"### {idx}. [{title}]({url})\n"
+                f"- **Hype Score:** {score}/10\n"
+                f"- **Signal Evaluation:** {reason}\n"
+                f"- **Brief Summary:** {summary}\n"
+            )
+            report_sections.append(article_block)
+    else:
+        report_sections.append("## Curated Articles\n*No articles passed the technical substance threshold in this run.*\n")
+
+    # 4. Wrap up with telemetry and operational metrics
+    db_error = state.get("db_error")
+    telemetry_block = (
+        "---\n"
+        "## Pipeline Execution Summary\n"
+        f"- **Total Evaluated by LLM:** {total_evaluated}\n"
+        f"- **Passed (Low Hype):** {passed_count} ({passed_pct:.1f}%)\n"
+        f"- **Filtered Out (High Hype):** {rejected_count} ({rejected_pct:.1f}%)\n"
+        f"- **Technical Failures (LLM/API):** {len(failed_articles)}\n"
+        f"- **Successfully Persisted to DB:** {state.get('saved_articles_count', 0)}\n"
+        f"- **Database Errors:** {db_error if db_error else 'None'}"
+    )
+    report_sections.append(telemetry_block)
+
+    final_report = "\n".join(report_sections)
+    logger.info("Pipeline report generated successfully.")
 
     return {"final_report": final_report}
