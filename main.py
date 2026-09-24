@@ -33,13 +33,14 @@ async def main():
 
     # Execute the pipeline graph
     try:
+        print(pipeline_graph.get_graph().draw_mermaid())
         final_state = await pipeline_graph.ainvoke(initial_state)
         print(final_state.get("final_report", "No final report generated."))
     except Exception as e:
         logger.error(f"Failed to execute the pipeline graph: {e}")
         return
 
-    return {"status": "success", "final_state": final_state["final_report"]}
+    return {"status": "success", "final_state": final_state.get("final_report", "No final report generated.")}
 
 if __name__ == "__main__":
     asyncio.run(main())
