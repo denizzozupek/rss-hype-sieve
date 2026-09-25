@@ -7,7 +7,7 @@ from core.utils import clean_html_text, extract_clean_summary
 EVAL_SOURCES = [
     "https://siliconangle.com/category/ai/feed/",
     "https://techcrunch.com/category/artificial-intelligence/feed/",
-    "https://huggingface.co/blog/feed.xml",
+    "https://simonwillison.net/atom/everything/",
     "https://www.marktechpost.com/feed/",
 ]
 
