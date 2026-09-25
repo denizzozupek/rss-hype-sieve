@@ -33,7 +33,6 @@ async def main():
 
     # Execute the pipeline graph
     try:
-        print(pipeline_graph.get_graph().draw_mermaid())
         final_state = await pipeline_graph.ainvoke(initial_state)
         print(final_state.get("final_report", "No final report generated."))
     except Exception as e:
