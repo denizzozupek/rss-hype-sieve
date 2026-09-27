@@ -6,7 +6,7 @@
   <img src="https://img.shields.io/badge/Evaluated_with-LangSmith-0052CC?style=flat" alt="LangSmith">
   <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat" alt="License MIT">
 </p>
----
+
 **RSS-Hype-Sieve** is a deterministic Directed Acyclic Graph (DAG) data pipeline engineered with LangGraph to filter, score, and eliminate hype-driven contents from technical RSS feeds. By enforcing causal structured outputs via Pydantic and executing an asynchronous processing architecture, the system achieves a 93% evaluation success against human-curated benchmarks.
 
 ---
