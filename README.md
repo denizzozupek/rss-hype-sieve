@@ -7,7 +7,7 @@
   <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat" alt="License MIT">
 </p>
 
-**RSS-Hype-Sieve** is a deterministic Directed Acyclic Graph (DAG) data pipeline engineered with LangGraph to filter, score, and eliminate hype-driven contents from technical RSS feeds. By enforcing causal structured outputs via Pydantic and executing an asynchronous processing architecture, the system achieves a 93% evaluation success against human-curated benchmarks.
+**RSS-Hype-Sieve** is a deterministic Directed Acyclic Graph (DAG) data pipeline engineered with LangGraph to filter, score, and eliminate hype-driven contents from technical RSS feeds. By enforcing causal structured outputs via Pydantic and executing an asynchronous processing architecture, the system achieves an 88% evaluation success against human-curated benchmarks.
 
 ---
 ## Problem Statement
@@ -51,7 +51,7 @@ RSS-Hype-Sieve models content filtering as a deterministic, state-based workflow
 
 - **Decision:** Rather than prompting the model directly for a scalar rating (1–10), the contract forces a two-step causal dependency: the model must identify a specific rubric rule violation (`violated_rule`) before generating the penalty score (`hype_score`).
 
-- **Reason:** Unconstrained numerical outputs suffer from calibration drift across batches. Coupling rule verification directly to score emission grounds the model's judgment and brought evaluation alignment to 93% against curated benchmarks.
+- **Reason:** Unconstrained numerical outputs suffer from calibration drift across batches. Coupling rule verification directly to score emission grounds the model's judgment and brought evaluation alignment to 88% against curated benchmarks.
 
 #### 3. Non-Blocking Persistence
 
@@ -145,36 +145,44 @@ To avoid subjective grading and regression during prompt/schema iterations, the 
 
 ### 1. Iterative Calibration Metrics
 
-| Iteration         | Description                                                 | Rule Match Accuracy (`hype_rule`) | Score Alignment (`hype_score`) |
-| :---------------- | :---------------------------------------------------------- | :-------------------------------- | :----------------------------- |
-| **#1 (Baseline)** | Unconstrained classification & direct scoring               | **81.0%**                         | **69.0%**                      |
-| **#2 (Refined)**  | Initial rule constraints & rubric definitions               | **88.0%**                         | **88.0%**                      |
-| **#3 (Final)**    | Enforced Pydantic causal schema (`violated_rule` → `score`) | **93.8%**                         | **86.0%**                      |
+| Iteration                   | Description                                                                  | Rule Match Accuracy (`hype_rule`) | Score Alignment (`hype_score`) | P50 Latency |
+|:----------------------------|:-----------------------------------------------------------------------------|:----------------------------------|:-------------------------------|:------------|
+| **#1 (Baseline)**           | Unconstrained classification & direct scoring                                | **81.0%** (13/16)                 | **69.0%** (11/16)              | 3.37s       |
+| **#2 (Refined)**            | Initial rubric rules without causal enforcement                              | **88.0%** (14/16)                 | **88.0%** (14/16)              | 3.11s       |
+| **#3 (Schema Enforced)**    | Causal Pydantic schema (strict schema induced false positives on benchmarks) | **81.3%** (13/16)                 | **75.0%** (12/16)              | 3.95s       |
+| **#4 (Final / Calibrated)** | Negative rule boundaries & substance pre-check for benchmarks/analyses       | **88.0%** (14/16)                 | **88.0%** (14/16)              | 3.95s       |
 
 ![LangSmith Evaluation Iterations](assets/image.png)
 
-Enforcing the causal schema increased deterministic rule adherence to **93.8%** (15/16 accuracy), eliminating ungrounded hallucinations where the model assigned extreme scores without an explicit rubric violation.
+The calibrated prompt and schema boundaries achieved deterministic rule adherence of **88%** (14/16 accuracy), reducing ungrounded hallucinations where the model assigned extreme scores without an explicit rubric violation.
 
 ---
 
-### 2. Failure Mode Analysis (Edge Cases)
+### 2. Failure Mode Analysis & Iteration Learnings
 
-Evaluation of the failing samples revealed a primary systemic failure mode: **Over-Aggressive Penalization on Benchmark & Analytical Content**.
+#### Systematic Regression in Iteration #3 (Strict Causal Enforcement)
 
-* **Benchmark Claims as Unverified Hype:**
-  * *Sample:* `"Black Forest Labs Releases FLUX 3 Action: A 7B Open-Weights World Action Model That Tops RoboLab-120"`
-  * *Ground Truth:* `violated_rule: NONE` (Score: 2)
-  * *Model Output:* `violated_rule: UNVERIFIED_CLAIMS` (Score: 8)
-  * *Root Cause:* The model penalized comparative benchmark metrics (`"Tops RoboLab-120"`) as marketing hype rather than legitimate technical reporting.
-* **Op-Eds Misclassified as Promotional:**
-  * *Sample:* `"More agents go rogue — but AI companies aren’t slowing down yet"`
-  * *Ground Truth:* `violated_rule: NONE` (Score: 4)
-  * *Model Output:* `violated_rule: UNVERIFIED_CLAIMS` (Score: 8)
-  * *Root Cause:* The model conflated critical journalism and metaphorical framing (`"go rogue"`) with unsubstantiated product hype.
+Enforcing a strict Pydantic causal dependency (`violated_rule != NONE` strictly maps to `hype_score >= 7`) initially caused a regression in accuracy from **88.0% down to 81.3%**.
+
+Because the model was stripped of arbitrary scoring freedom, it defaulted to over-penalizing technical headlines containing benchmark metrics (e.g., *"Tops RoboLab-120"*) as `UNVERIFIED_CLAIMS`. Calibrating the prompt with negative rule boundaries and a substance pre-check resolved the benchmark false positives, recovering accuracy back to **88.0% (14/16)**.
+
+#### Remaining Edge Cases (Iteration #4 Analysis)
+
+- **Feature Releases vs. Buzzword Overlap:**
+  - *Sample:* `"Exclusive: Warp adds programmable agents to its AI-native HR platform"`
+  - *Ground Truth:* `violated_rule: NONE` (Score: 5)
+  - *Model Output:* `violated_rule: BUZZWORD_HEAVY` (Score: 7)
+  - *Root Cause:* The model penalized enterprise product positioning terms (`"AI-native"`, `"programmable agents"`) as empty marketing superlatives rather than recognizing a functional feature release.
+
+- **Critical Journalism vs. Alarmist Hype:**
+  - *Sample:* `"More agents go rogue — but AI companies aren’t slowing down yet"`
+  - *Ground Truth:* `violated_rule: NONE` (Score: 4)
+  - *Model Output:* `violated_rule: UNVERIFIED_CLAIMS` (Score: 8)
+  - *Root Cause:* The model conflated analytical journalism and metaphorical framing (`"go rogue"`) with unsubstantiated hype, failing to separate industry critique from marketing spin.
 
 ### 3. Mitigation Strategy & Next Steps
-* **Context Ingestion:** Pass the first 250 tokens of article content alongside the title to distinguish between unsubstantiated marketing claims and benchmark-backed releases.
-* **Few-Shot Domain Calibration:** Add explicit few-shot counter-examples to the prompt demonstrating that standard benchmark citations (e.g., MMLU, RoboLab) do not constitute `UNVERIFIED_CLAIMS`.
+- **Functional Feature Context:** Treat concrete product capabilities as evidence of substance, even when the headline includes enterprise positioning terms or AI buzzwords.
+- **Editorial Context Calibration:** Add explicit examples distinguishing analytical journalism and metaphorical framing from promotional or unverified claims.
 
 ---
 ## Project Structure 
