@@ -9,6 +9,8 @@
 
 **RSS-Hype-Sieve** is a deterministic Directed Acyclic Graph (DAG) data pipeline engineered with LangGraph to filter, score, and eliminate hype-driven contents from technical RSS feeds. By enforcing causal structured outputs via Pydantic and executing an asynchronous processing architecture, the system achieves an 88% evaluation success against human-curated benchmarks.
 
+[![RSS-Hype-Sieve GUI](assets/app_gui_screenshot.png)](assets/app_gui_screenshot.png)
+
 ---
 ## Problem Statement
 
@@ -270,6 +272,14 @@ Trigger the complete DAG execution (ingestion → cleaning → evaluation → pe
 
 ```bash
 python main.py
+```
+
+### Running the GUI
+
+Launch the Streamlit interface for interactive feed filtering, pipeline execution, telemetry, and database inspection:
+
+```bash
+streamlit run app_gui.py
 ```
 
 ### Running Evaluations (LangSmith Benchmark)
