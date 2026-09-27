@@ -57,11 +57,11 @@ async def preprocess_text_node(state: PipelineGraphState):
     cleaned_articles: list[ArticleState] = []
     for article in raw_articles:
 
-        summary = article.get("summary")
+        summary = article["summary"]
         content = article.get("content", None)
 
         if not summary and not content:
-            logger.warning(f"Article {article.get('url')} has no summary or content.")
+            logger.warning(f"Article {article['url']} has no summary or content.")
             continue
 
         cleaned_summary = extract_clean_summary(summary, content)

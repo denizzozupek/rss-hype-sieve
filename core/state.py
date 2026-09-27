@@ -15,7 +15,7 @@ class EvaluatedArticleState(ArticleState):
     hype_reason: str
     violated_rule: HypeRules | None
 
-class PipelineGraphState(TypedDict, total=False):
+class PipelineGraphState(TypedDict):
     sources: list[str]
     raw_articles: list[ArticleState]
     evaluated_articles: list[EvaluatedArticleState]
